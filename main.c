@@ -13,6 +13,7 @@ void printCommands() {
 	puts("cd <dir>: Enter a directory.");
 	puts("extract <file> <dst>: Export a file as an independent file.");
 	puts("info <file>: Get the detailed info of a file.");
+	puts("usefat <fat>: Use a FAT other than the first one.");
 	puts("help: List available commands.");
 	puts("exit: Exit from the disk image viewer.\n");
 }
@@ -41,17 +42,17 @@ void openPartitionImage(char* imageFileName) {
 			for (uint32_t i = 0; i < currentDir->fileCount; i++) {
 				LNameDirEntryGroup file = currentDir->files[i];
 				uint32_t cluster = file.head->FstClusHI << 16 | file.head->FstClusLO;
-				printf("%-6d%-48.48s%-16s%#-12X%#-18llX%-12ld%#4X\n", i,
-					file.name, parseShortName(file.head), cluster, 
-					getClusterOffset(vol->PBR, cluster), file.head->FileSize, file.head->Attr);
+				printf("%-6d%#-12X%#-18llX%-12ld%#4X%-16s%-48.48s\n", i, cluster, 
+					getClusterOffset(vol->PBR, cluster), file.head->FileSize, file.head->Attr, 
+					parseShortName(file.head), file.name);
 			}
 		} else if (strcmp(cmd, "lsshort") == 0) {
 			for (uint32_t i = 0; i < currentDir->fileCount; i++) {
 				LNameDirEntryGroup file = currentDir->files[i];
 				uint32_t cluster = file.head->FstClusHI << 16 | file.head->FstClusLO;
-				printf("%-6d%-16.16s%#-12X%#-18llX%-12ld%#4X\n", i,
-					parseShortName(file.head), cluster, 
-					getClusterOffset(vol->PBR, cluster), file.head->FileSize, file.head->Attr);
+				printf("%-6d%#-12X%#-18llX%-12ld%#4X%-16.16s\n", i, cluster, 
+					getClusterOffset(vol->PBR, cluster), file.head->FileSize, file.head->Attr, 
+					parseShortName(file.head));
 			}
 		} else if (strcmp(cmd, "cd") == 0) {
 			char name[514] = { 0 };
@@ -181,6 +182,14 @@ void openPartitionImage(char* imageFileName) {
 				if (i == currentDir->fileCount - 1) {
 					puts("Not found!");
 				}
+			}
+		} else if (strcmp(cmd, "usefat") == 0) {
+			uint32_t fatNum;
+			scanf("%lu", &fatNum);
+			if (fatNum >= 0 && fatNum < vol->PBR->NumFATs) {
+				activeFATNum = fatNum;
+			} else {
+				puts("Such a FAT doesn't exist!");
 			}
 		} else if (strcmp(cmd, "help") == 0) {
 			printCommands();

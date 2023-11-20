@@ -609,7 +609,7 @@ Dir* readRootDir(FILE* fp, PBR *PBR) {
 }
 
 inline fpos_t getFATLocation(uint32_t cluster, PBR *PBR) {
-	return cluster * 4L + PBR->RsvdSecCnt * PBR->BytesPerSec;
+	return cluster * 4L + getFATBeginLocation(PBR) + activeFATNum * PBR->FATSz32 * PBR->BytesPerSec;
 }
 
 inline fpos_t getFATBeginLocation(PBR* PBR) {
