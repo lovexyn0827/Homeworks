@@ -355,12 +355,18 @@ RF rf(
 assign QA_Bypass = WDat_M;
 assign QB_Bypass = WDat_M;
 
-wire EQ_D, BypassQA_FastCmp, BypassQB_FastCmp;
+wire EQ_D;
+wire BypassQA_FastCmp_E, BypassQA_FastCmp_M, BypassQA_FastCmp_W;
+wire BypassQB_FastCmp_E, BypassQB_FastCmp_M, BypassQB_FastCmp_W;
 wire[31:0] QA_D_FastCmp, QB_D_FastCmp;
-assign BypassQA_FastCmp = RWrt_E & (WIdx_E != 5'b0) & (WIdx_E == RS_D);
-assign BypassQB_FastCmp = RWrt_E & (WIdx_E != 5'b0) & (WIdx_E == RT_D);
-assign QA_D_FastCmp = BypassQA_FastCmp ? AluOut_E : QA_D;
-assign QB_D_FastCmp = BypassQB_FastCmp ? AluOut_E : QB_D;
+assign BypassQA_FastCmp_W = RWrt_W & (WIdx_W != 5'b0) & (WIdx_W == RS_D);
+assign BypassQB_FastCmp_W = RWrt_W & (WIdx_W != 5'b0) & (WIdx_W == RT_D);
+assign BypassQA_FastCmp_E = RWrt_E & (WIdx_E != 5'b0) & (WIdx_E == RS_D);
+assign BypassQB_FastCmp_E = RWrt_E & (WIdx_E != 5'b0) & (WIdx_E == RT_D);
+assign BypassQA_FastCmp_M = RWrt_M & (WIdx_M != 5'b0) & (WIdx_M == RS_D);
+assign BypassQB_FastCmp_M = RWrt_M & (WIdx_M != 5'b0) & (WIdx_M == RT_D);
+assign QA_D_FastCmp = BypassQA_FastCmp_E ? AluOut_E : (BypassQA_FastCmp_M ? WDat_M : (BypassQA_FastCmp_W ? WDat_W : QA_D));
+assign QB_D_FastCmp = BypassQB_FastCmp_E ? AluOut_E : (BypassQB_FastCmp_M ? WDat_M : (BypassQB_FastCmp_W ? WDat_W : QB_D));
 assign EQ_D = QA_D_FastCmp == QB_D_FastCmp;
 assign BranchTaken_F = BrEn_D & EQ_D;
 
@@ -443,8 +449,8 @@ SegRegsEXE2MEM EXE2MEM(
     .ALUOUT_M(AluOut_M)
 );
 
-assign BypassQA = RWrt_M & (QAIdx_M != 5'b0) & (QAIdx_M == WIdx_M);
-assign BypassQB = RWrt_M & (QBIdx_M != 5'b0) & (QBIdx_M == WIdx_M);
+assign BypassQA = RWrt_M & (QAIdx_M != 5'b0) & (QAIdx_E == WIdx_M);
+assign BypassQB = RWrt_M & (QBIdx_M != 5'b0) & (QBIdx_E == WIdx_M);
 assign BypassMem = (WIdx_M != 5'b0) & 1'b0;   // TODO
 
 wire[31:0] BusDat_M, WDat_M;
