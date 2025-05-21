@@ -25,8 +25,8 @@ endmodule
 module ALU (
     input wire[31:0] A, B, 
     input wire[3:0] FUNC, 
-    output wire[31:0] OUT, 
-    output wire /*LT, EQ, GT*/ EQ
+    output wire[31:0] OUT
+    //output wire /*LT, EQ, GT*/ EQ
 );
 
 wire[31:0] outs[15:0];
@@ -51,7 +51,7 @@ assign outs[15] = 0;
 assign OUT = outs[FUNC];
 
 //assign LT = OUT[31];
-assign EQ = OUT == 0;
+//assign EQ = OUT == 0;
 //assign GT = !(LT ^ GT);
 
 endmodule
@@ -156,12 +156,12 @@ endmodule
 module SegRegsID2EXE(
     input wire CLK, RST, WRT, 
     input wire[3:0] ALUC_D, 
-    input wire ALUB_D, M2R_D, RWRT_D, MWRT_D, BREN_D, 
-    input wire[31:0] QA_D, QB_D, PCP4_D, IMM_D, 
+    input wire ALUB_D, M2R_D, RWRT_D, MWRT_D, 
+    input wire[31:0] QA_D, QB_D, IMM_D, 
     input wire[4:0] WIDX_D, QAIDX_D, QBIDX_D, 
     output reg[3:0] ALUC_E, 
-    output reg ALUB_E, M2R_E, RWRT_E, MWRT_E, BREN_E, 
-    output reg[31:0] QA_E, QB_E, PCP4_E, IMM_E, 
+    output reg ALUB_E, M2R_E, RWRT_E, MWRT_E, 
+    output reg[31:0] QA_E, QB_E, IMM_E, 
     output reg[4:0] WIDX_E, QAIDX_E, QBIDX_E
 );
 
@@ -172,10 +172,8 @@ always @(posedge CLK) begin
         M2R_E <= RST ? 1'b0 : M2R_D;
         RWRT_E <= RST ? 1'b0 : RWRT_D;
         MWRT_E <= RST ? 1'b0 : MWRT_D;
-        BREN_E <= RST ? 1'b0 : BREN_D;
         QA_E <= RST ? 32'b0 : QA_D;
         QB_E <= RST ? 32'b0 : QB_D;
-        PCP4_E <= RST ? 32'b0 : PCP4_D;
         IMM_E <= RST ? 32'b0 : IMM_D;
         WIDX_E <= RST ? 5'b0 : WIDX_D;
         QAIDX_E <= RST ? 5'b0 : QAIDX_D;
@@ -187,12 +185,12 @@ endmodule
 
 module SegRegsEXE2MEM(
     input wire CLK, RST, WRT, 
-    input wire RWRT_E, MWRT_E, M2R_E, BRTKN_E, 
+    input wire RWRT_E, MWRT_E, M2R_E, 
     input wire[4:0] WIDX_E, QAIDX_E, QBIDX_E, 
-    input wire[31:0] ALUOUT_E, QB_E, PCBR_E, 
-    output reg RWRT_M, MWRT_M, M2R_M, BRTKN_M, 
+    input wire[31:0] ALUOUT_E, QB_E, 
+    output reg RWRT_M, MWRT_M, M2R_M, 
     output reg[4:0] WIDX_M, QAIDX_M, QBIDX_M, 
-    output reg[31:0] ALUOUT_M, QB_M, PCBR_M
+    output reg[31:0] ALUOUT_M, QB_M
 );
 
 always @(posedge CLK) begin
@@ -200,13 +198,11 @@ always @(posedge CLK) begin
         RWRT_M <= RST ? 1'b0 : RWRT_E;
         MWRT_M <= RST ? 1'b0 : MWRT_E;
         M2R_M <= RST ? 1'b0 : M2R_E;
-        BRTKN_M <= RST ? 1'b0 : BRTKN_E;
         WIDX_M <= RST ? 5'b0 : WIDX_E;
         QAIDX_M <= RST ? 5'b0 : QAIDX_E;
         QBIDX_M <= RST ? 5'b0 : QBIDX_E;
         ALUOUT_M <= RST ? 32'b0 : ALUOUT_E;
         QB_M <= RST ? 32'b0 : QB_E;
-        PCBR_M <= RST ? 32'b0 : PCBR_E;
     end
 end
 
@@ -270,9 +266,9 @@ always @(posedge EffClk) begin
 end
 
 assign INSNADDR = PC;
-assign SegRegsWrtF2D = ~BranchTaken_F;
-assign SegRegsWrtD2E = ~BranchTaken_F;
-assign SegRegsWrtE2M = ~BranchTaken_F;
+assign SegRegsWrtF2D = 1'b1;
+assign SegRegsWrtD2E = 1'b1;
+assign SegRegsWrtE2M = 1'b1;
 
 // Stage II: Instruction Decode
 
@@ -359,11 +355,24 @@ RF rf(
 assign QA_Bypass = WDat_M;
 assign QB_Bypass = WDat_M;
 
+wire EQ_D, BypassQA_FastCmp, BypassQB_FastCmp;
+wire[31:0] QA_D_FastCmp, QB_D_FastCmp;
+assign BypassQA_FastCmp = RWrt_E & (WIdx_E != 5'b0) & (WIdx_E == RS_D);
+assign BypassQB_FastCmp = RWrt_E & (WIdx_E != 5'b0) & (WIdx_E == RT_D);
+assign QA_D_FastCmp = BypassQA_FastCmp ? AluOut_E : QA_D;
+assign QB_D_FastCmp = BypassQB_FastCmp ? AluOut_E : QB_D;
+assign EQ_D = QA_D_FastCmp == QB_D_FastCmp;
+assign BranchTaken_F = BrEn_D & EQ_D;
+
+wire[31:0] PCBR_D;
+assign PCBR_D = PCP4_D + (Imm_D << 2);
+assign PCBR_F = PCBR_D;
+
 // Stage III: Execution
 
 wire[3:0] AluC_E;
-wire AluB_E, M2R_E, RWrt_E, MWrt_E, BrEn_E;
-wire[31:0] QA_E, QB_E, PCP4_E, Imm_E;
+wire AluB_E, M2R_E, RWrt_E, MWrt_E;
+wire[31:0] QA_E, QB_E, Imm_E;
 wire[4:0] WIdx_E, QAIdx_E, QBIdx_E;
 
 SegRegsID2EXE ID2EXE(
@@ -375,10 +384,8 @@ SegRegsID2EXE ID2EXE(
     .M2R_D(M2R_D), 
     .RWRT_D(RWrt_D), 
     .MWRT_D(MWrt_D), 
-    .BREN_D(BrEn_D), 
     .QA_D(QA_D), 
     .QB_D(QB_D),  
-    .PCP4_D(PCP4_D), 
     .IMM_D(Imm_D), 
     .WIDX_D(WIdx_D),
     .QAIDX_D(RS_D), 
@@ -388,10 +395,8 @@ SegRegsID2EXE ID2EXE(
     .M2R_E(M2R_E), 
     .RWRT_E(RWrt_E), 
     .MWRT_E(MWrt_E), 
-    .BREN_E(BrEn_E), 
     .QA_E(QA_E), 
     .QB_E(QB_E), 
-    .PCP4_E(PCP4_E), 
     .IMM_E(Imm_E), 
     .WIDX_E(WIdx_E), 
     .QAIDX_E(QAIdx_E), 
@@ -399,29 +404,22 @@ SegRegsID2EXE ID2EXE(
 );
 
 wire[31:0] AluOut_E;
-wire EQ_E;
 
 ALU alu(
     .A(BypassQA ? QA_Bypass : QA_E), 
     .B(AluB_E ? Imm_E : (BypassQB ? QB_Bypass : QB_E)), 
     .FUNC(AluC_E), 
-    .OUT(AluOut_E), 
+    .OUT(AluOut_E)
 	//.LT(LT), 
 	//.GT(GT), 
-	.EQ(EQ_E)
+	//.EQ()
 );
-
-wire BranchTaken_E;
-assign BranchTaken_E = BrEn_E & EQ_E;
-
-wire[31:0] PCBR_E;
-assign PCBR_E = PCP4_E + (Imm_E << 2);
 
 // Stage IV: Memory
 
-wire[31:0] AluOut_M, QB_M, PCBR_M;
+wire[31:0] AluOut_M, QB_M;
 wire[4:0] WIdx_M, QAIdx_M, QBIdx_M;
-wire RWrt_M, MWrt_M, M2R_M, BranchTaken_M;
+wire RWrt_M, MWrt_M, M2R_M;
 
 SegRegsEXE2MEM EXE2MEM(
     .CLK(EffClk), 
@@ -430,22 +428,18 @@ SegRegsEXE2MEM EXE2MEM(
     .RWRT_E(RWrt_E), 
     .MWRT_E(MWrt_E), 
     .M2R_E(M2R_E), 
-    .BRTKN_E(BranchTaken_E), 
     .WIDX_E(WIdx_E), 
     .QAIDX_E(QAIdx_E), 
     .QBIDX_E(QBIdx_E), 
     .QB_E(QB_E),
-    .PCBR_E(PCBR_E), 
     .ALUOUT_E(AluOut_E), 
     .RWRT_M(RWrt_M), 
     .MWRT_M(MWrt_M), 
     .M2R_M(M2R_M), 
-    .BRTKN_M(BranchTaken_M), 
     .WIDX_M(WIdx_M), 
     .QAIDX_M(QAIdx_M), 
     .QBIDX_M(QBIdx_M), 
     .QB_M(QB_M),
-    .PCBR_M(PCBR_M), 
     .ALUOUT_M(AluOut_M)
 );
 
@@ -461,8 +455,6 @@ assign BusDat_M = DATIN;
 assign WDat_M = M2R_M ? BusDat_M : AluOut_M;
 assign MWRT = MWrt_M;
 
-assign PCBR_F = PCBR_M;
-assign BranchTaken_F = BranchTaken_M;
 assign Mem_Bypass = BusDat_M;
 
 // Stage V: Write Back
