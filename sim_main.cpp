@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
 		VerilatedVcdC* tfp = new VerilatedVcdC;
 		top->trace(tfp, 99);
     	tfp->open("sim.vcd");
-		int  i = 1000000;
+		int  i = 1000;
 		top->RST = 1;
 		top->CLK = 1;
 		contextp->timeInc(5000);
