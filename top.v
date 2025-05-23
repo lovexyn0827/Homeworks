@@ -158,11 +158,11 @@ module SegRegsID2EXE(
     input wire[3:0] ALUC_D, 
     input wire ALUB_D, M2R_D, RWRT_D, MWRT_D, 
     input wire[31:0] QA_D, QB_D, IMM_D, 
-    input wire[4:0] WIDX_D, QAIDX_D, QBIDX_D, 
+    input wire[4:0] WIDX_D, 
     output reg[3:0] ALUC_E, 
     output reg ALUB_E, M2R_E, RWRT_E, MWRT_E, 
     output reg[31:0] QA_E, QB_E, IMM_E, 
-    output reg[4:0] WIDX_E, QAIDX_E, QBIDX_E
+    output reg[4:0] WIDX_E
 );
 
 always @(posedge CLK) begin
@@ -176,8 +176,6 @@ always @(posedge CLK) begin
         QB_E <= RST ? 32'b0 : QB_D;
         IMM_E <= RST ? 32'b0 : IMM_D;
         WIDX_E <= RST ? 5'b0 : WIDX_D;
-        QAIDX_E <= RST ? 5'b0 : QAIDX_D;
-        QBIDX_E <= RST ? 5'b0 : QBIDX_D;
     end
 end
 
@@ -186,10 +184,10 @@ endmodule
 module SegRegsEXE2MEM(
     input wire CLK, RST, WRT, 
     input wire RWRT_E, MWRT_E, M2R_E, 
-    input wire[4:0] WIDX_E, QAIDX_E, QBIDX_E, 
+    input wire[4:0] WIDX_E, 
     input wire[31:0] ALUOUT_E, QB_E, 
     output reg RWRT_M, MWRT_M, M2R_M, 
-    output reg[4:0] WIDX_M, QAIDX_M, QBIDX_M, 
+    output reg[4:0] WIDX_M, 
     output reg[31:0] ALUOUT_M, QB_M
 );
 
@@ -199,8 +197,6 @@ always @(posedge CLK) begin
         MWRT_M <= RST ? 1'b0 : MWRT_E;
         M2R_M <= RST ? 1'b0 : M2R_E;
         WIDX_M <= RST ? 5'b0 : WIDX_E;
-        QAIDX_M <= RST ? 5'b0 : QAIDX_E;
-        QBIDX_M <= RST ? 5'b0 : QBIDX_E;
         ALUOUT_M <= RST ? 32'b0 : ALUOUT_E;
         QB_M <= RST ? 32'b0 : QB_E;
     end
@@ -250,8 +246,8 @@ assign SegRegsWrtM2W = 1'b1;
 
 // Bypasses
 
-wire[31:0] QA_Bypass, QB_Bypass, Mem_Bypass;
-wire BypassQA, BypassQB, BypassMem;
+wire[31:0] Mem_Bypass;
+wire BypassMem;
 
 // Stage I: Instruction Fetch
 
@@ -352,9 +348,6 @@ RF rf(
     .WD(WDat_D)
 );
 
-assign QA_Bypass = WDat_M;
-assign QB_Bypass = WDat_M;
-
 wire EQ_D;
 wire BypassQA_FastCmp_E, BypassQA_FastCmp_M, BypassQA_FastCmp_W;
 wire BypassQB_FastCmp_E, BypassQB_FastCmp_M, BypassQB_FastCmp_W;
@@ -379,7 +372,7 @@ assign PCBR_F = PCBR_D;
 wire[3:0] AluC_E;
 wire AluB_E, M2R_E, RWrt_E, MWrt_E;
 wire[31:0] QA_E, QB_E, Imm_E;
-wire[4:0] WIdx_E, QAIdx_E, QBIdx_E;
+wire[4:0] WIdx_E;
 
 SegRegsID2EXE ID2EXE(
     .CLK(EffClk), 
@@ -390,12 +383,10 @@ SegRegsID2EXE ID2EXE(
     .M2R_D(M2R_D), 
     .RWRT_D(RWrt_D), 
     .MWRT_D(MWrt_D), 
-    .QA_D(QA_D), 
-    .QB_D(QB_D),  
+    .QA_D(QA_D_FastCmp), 
+    .QB_D(QB_D_FastCmp),  
     .IMM_D(Imm_D), 
     .WIDX_D(WIdx_D),
-    .QAIDX_D(RS_D), 
-    .QBIDX_D(RT_D),  
     .ALUC_E(AluC_E), 
     .ALUB_E(AluB_E), 
     .M2R_E(M2R_E), 
@@ -404,16 +395,14 @@ SegRegsID2EXE ID2EXE(
     .QA_E(QA_E), 
     .QB_E(QB_E), 
     .IMM_E(Imm_E), 
-    .WIDX_E(WIdx_E), 
-    .QAIDX_E(QAIdx_E), 
-    .QBIDX_E(QBIdx_E)
+    .WIDX_E(WIdx_E)
 );
 
 wire[31:0] AluOut_E;
 
 ALU alu(
-    .A(BypassQA ? QA_Bypass : QA_E), 
-    .B(AluB_E ? Imm_E : (BypassQB ? QB_Bypass : QB_E)), 
+    .A(QA_E), 
+    .B(AluB_E ? Imm_E : QB_E), 
     .FUNC(AluC_E), 
     .OUT(AluOut_E)
 	//.LT(LT), 
@@ -424,7 +413,7 @@ ALU alu(
 // Stage IV: Memory
 
 wire[31:0] AluOut_M, QB_M;
-wire[4:0] WIdx_M, QAIdx_M, QBIdx_M;
+wire[4:0] WIdx_M;
 wire RWrt_M, MWrt_M, M2R_M;
 
 SegRegsEXE2MEM EXE2MEM(
@@ -435,22 +424,16 @@ SegRegsEXE2MEM EXE2MEM(
     .MWRT_E(MWrt_E), 
     .M2R_E(M2R_E), 
     .WIDX_E(WIdx_E), 
-    .QAIDX_E(QAIdx_E), 
-    .QBIDX_E(QBIdx_E), 
     .QB_E(QB_E),
     .ALUOUT_E(AluOut_E), 
     .RWRT_M(RWrt_M), 
     .MWRT_M(MWrt_M), 
     .M2R_M(M2R_M), 
     .WIDX_M(WIdx_M), 
-    .QAIDX_M(QAIdx_M), 
-    .QBIDX_M(QBIdx_M), 
     .QB_M(QB_M),
     .ALUOUT_M(AluOut_M)
 );
 
-assign BypassQA = RWrt_M & (QAIdx_M != 5'b0) & (QAIdx_E == WIdx_M);
-assign BypassQB = RWrt_M & (QBIdx_M != 5'b0) & (QBIdx_E == WIdx_M);
 assign BypassMem = (WIdx_M != 5'b0) & 1'b0;   // TODO
 
 wire[31:0] BusDat_M, WDat_M;
@@ -504,7 +487,18 @@ always @(ADDR) begin
         32'h0000000B: DAT <= 32'h08100007;
         32'h0000000C: DAT <= 32'hac120040;
         32'h0000000D: DAT <= 32'h8c100040;
-        32'h0000000E: DAT <= 32'h0800000e;
+        32'h0000000E: DAT <= 32'h22730001;
+
+        32'h0000000F: DAT <= 32'h22730001;
+        32'h00000010: DAT <= 32'h22730001;
+        32'h00000011: DAT <= 32'h22730001;
+        32'h00000012: DAT <= 32'h22730001;
+        32'h00000013: DAT <= 32'h22730001;
+        32'h00000014: DAT <= 32'h10000000;
+        32'h00000015: DAT <= 32'h22730001;
+        32'h00000016: DAT <= 32'h22730001;
+        32'h00000017: DAT <= 32'h22730001;
+        32'h00000018: DAT <= 32'h08000017;
         default: DAT <= 32'h00000000;
     endcase
 end
