@@ -113,7 +113,7 @@ module CU (
     input wire[5:0] OPC, FUNC, 
     //input wire /*LT, GT,*/ EQ, 
     output wire[3:0] ALUC, 
-    output wire RDST, ALUB, M2R, RWRT, MWRT, VLD, EXOPS, 
+    output wire RDST, ALUB, M2R, RWRT, MWRT, VLD, EXOPS, LB, 
     output wire[1:0] NPC
 );
 
@@ -127,16 +127,17 @@ wire BEQ = OPC == 6'b000100;
 wire ADDI = OPC == 6'b001000;
 wire LW = OPC == 6'b100011;
 wire SW = OPC == 6'b101011;
+assign LB = OPC == 6'b100000;
 
 wire[1:0] NPCHard = J ? 2'b10 : (BEQ ? 2'b01 : 2'b00);
 
 assign RDST = RType;
-assign ALUB = ADDI | LW | SW;
-assign M2R = LW;
+assign ALUB = ADDI | LW | SW | LB;
+assign M2R = LW | LB;
 assign MWRT = SW;
-assign RWRT = RType | ADDI | LW;
-assign VLD = ADD | SUB | AND | OR | J | BEQ | ADDI | LW | SW;
-assign EXOPS = ADDI | BEQ | LW | SW;
+assign RWRT = RType | ADDI | LW | LB;
+assign VLD = ADD | SUB | AND | OR | J | BEQ | ADDI | LW | SW | LB;
+assign EXOPS = ADDI | BEQ | LW | SW | LB;
 
 assign NPC = NPCHard;// == 2'b01 ? (EQ ? 2'b01 : 2'b00) : NPCHard;
 
@@ -188,11 +189,11 @@ endmodule
 module SegRegsID2EXE(
     input wire CLK, RST, WRT, 
     input wire[3:0] ALUC_D, 
-    input wire ALUB_D, M2R_D, RWRT_D, MWRT_D, 
+    input wire ALUB_D, M2R_D, RWRT_D, MWRT_D, LB_D, 
     input wire[31:0] QA_D, QB_D, IMM_D, 
     input wire[4:0] WIDX_D, 
     output reg[3:0] ALUC_E, 
-    output reg ALUB_E, M2R_E, RWRT_E, MWRT_E, 
+    output reg ALUB_E, M2R_E, RWRT_E, MWRT_E, LB_E, 
     output reg[31:0] QA_E, QB_E, IMM_E, 
     output reg[4:0] WIDX_E
 );
@@ -204,6 +205,7 @@ always @(posedge CLK) begin
         M2R_E <= RST ? 1'b0 : M2R_D;
         RWRT_E <= RST ? 1'b0 : RWRT_D;
         MWRT_E <= RST ? 1'b0 : MWRT_D;
+        LB_E <= RST ? 1'b0 : LB_D;
         QA_E <= RST ? 32'b0 : QA_D;
         QB_E <= RST ? 32'b0 : QB_D;
         IMM_E <= RST ? 32'b0 : IMM_D;
@@ -215,10 +217,10 @@ endmodule
 
 module SegRegsEXE2MEM(
     input wire CLK, RST, WRT, 
-    input wire RWRT_E, MWRT_E, M2R_E, 
+    input wire RWRT_E, MWRT_E, M2R_E, LB_E, 
     input wire[4:0] WIDX_E, 
     input wire[31:0] ALUOUT_E, QB_E, 
-    output reg RWRT_M, MWRT_M, M2R_M, 
+    output reg RWRT_M, MWRT_M, M2R_M, LB_M, 
     output reg[4:0] WIDX_M, 
     output reg[31:0] ALUOUT_M, QB_M
 );
@@ -228,6 +230,7 @@ always @(posedge CLK) begin
         RWRT_M <= RST ? 1'b0 : RWRT_E;
         MWRT_M <= RST ? 1'b0 : MWRT_E;
         M2R_M <= RST ? 1'b0 : M2R_E;
+        LB_M <= LB_E;
         WIDX_M <= RST ? 5'b0 : WIDX_E;
         ALUOUT_M <= RST ? 32'b0 : ALUOUT_E;
         QB_M <= RST ? 32'b0 : QB_E;
@@ -266,6 +269,7 @@ module CPU (
 // Globals
 
 wire EffClk;
+wire[31:0] EffDatIn;
 wire SegRegsRstF2D, SegRegsRstD2E, SegRegsRstE2M, SegRegsRstM2W;
 wire SegRegsWrtF2D, SegRegsWrtD2E, SegRegsWrtE2M, SegRegsWrtM2W;
 
@@ -334,7 +338,7 @@ InsnTokenizer it(
 wire[3:0] AluC_D;
 wire[1:0] NPC_D;
 
-wire RDst_D, AluB_D, M2R_D, RWrt_D, MWrt_D, ExOps_D, Vld_D;
+wire RDst_D, AluB_D, M2R_D, RWrt_D, MWrt_D, ExOps_D, LB_D, Vld_D;
 
 CU cu(
     .OPC(Opc_D), 
@@ -350,6 +354,7 @@ CU cu(
     .MWRT(MWrt_D), 
     .NPC(NPC_D), 
 	.EXOPS(ExOps_D), 
+    .LB(LB_D), 
     .VLD(Vld_D)
 );
 
@@ -402,7 +407,7 @@ assign PCBR_F = PCBR_D;
 // Stage III: Execution
 
 wire[3:0] AluC_E;
-wire AluB_E, M2R_E, RWrt_E, MWrt_E;
+wire AluB_E, M2R_E, RWrt_E, MWrt_E, LB_E;
 wire[31:0] QA_E, QB_E, Imm_E;
 wire[4:0] WIdx_E;
 
@@ -415,6 +420,7 @@ SegRegsID2EXE ID2EXE(
     .M2R_D(M2R_D), 
     .RWRT_D(RWrt_D), 
     .MWRT_D(MWrt_D), 
+    .LB_D(LB_D), 
     .QA_D(QA_D_FastCmp), 
     .QB_D(QB_D_FastCmp),  
     .IMM_D(Imm_D), 
@@ -424,6 +430,7 @@ SegRegsID2EXE ID2EXE(
     .M2R_E(M2R_E), 
     .RWRT_E(RWrt_E), 
     .MWRT_E(MWrt_E), 
+    .LB_E(LB_E), 
     .QA_E(QA_E), 
     .QB_E(QB_E), 
     .IMM_E(Imm_E), 
@@ -446,7 +453,7 @@ ALU alu(
 
 wire[31:0] AluOut_M, QB_M;
 wire[4:0] WIdx_M;
-wire RWrt_M, MWrt_M, M2R_M;
+wire RWrt_M, MWrt_M, M2R_M, LB_M;
 
 SegRegsEXE2MEM EXE2MEM(
     .CLK(EffClk), 
@@ -455,12 +462,14 @@ SegRegsEXE2MEM EXE2MEM(
     .RWRT_E(RWrt_E), 
     .MWRT_E(MWrt_E), 
     .M2R_E(M2R_E), 
+    .LB_E(LB_E), 
     .WIDX_E(WIdx_E), 
     .QB_E(QB_E),
     .ALUOUT_E(AluOut_E), 
     .RWRT_M(RWrt_M), 
     .MWRT_M(MWrt_M), 
     .M2R_M(M2R_M), 
+    .LB_M(LB_M), 
     .WIDX_M(WIdx_M), 
     .QB_M(QB_M),
     .ALUOUT_M(AluOut_M)
@@ -469,10 +478,21 @@ SegRegsEXE2MEM EXE2MEM(
 assign BypassMem = (WIdx_M != 5'b0) & 1'b0;   // TODO
 
 wire[31:0] BusDat_M, WDat_M;
+wire[7:0] DatBytesIn_M[3:0], ChosenByte_M;
 
-assign DATADDR = AluOut_M;
+assign DatBytesIn_M[0] = DATIN[7:0];
+assign DatBytesIn_M[1] = DATIN[15:8];
+assign DatBytesIn_M[2] = DATIN[23:16];
+assign DatBytesIn_M[3] = DATIN[31:24];
+
+assign ChosenByte_M = DatBytesIn_M[AluOut_M[1:0]];
+
+assign EffDatIn = LB_M ? { { 24{ ChosenByte_M[7] } }, ChosenByte_M } : DATIN;
+
+assign DATADDR = AluOut_M & 32'hFFFFFFFC;
+
 assign DATOUT = MWrt_M ? QB_M : 32'hZZZZZZZZ;
-assign BusDat_M = DATIN;
+assign BusDat_M = EffDatIn;
 assign WDat_M = M2R_M ? BusDat_M : AluOut_M;
 assign MWRT = MWrt_M;
 
@@ -517,20 +537,27 @@ always @(ADDR) begin
         32'h00000009: DAT <= 32'h22100001;
         32'h0000000A: DAT <= 32'h22310001;
         32'h0000000B: DAT <= 32'h08100007;
-        32'h0000000C: DAT <= 32'hac120040;
-        32'h0000000D: DAT <= 32'h8c100040;
-        32'h0000000E: DAT <= 32'h22730001;
 
-        32'h0000000F: DAT <= 32'h22730001;
-        32'h00000010: DAT <= 32'h22730001;
-        32'h00000011: DAT <= 32'h22730001;
-        32'h00000012: DAT <= 32'h22730001;
-        32'h00000013: DAT <= 32'h22730001;
-        32'h00000014: DAT <= 32'h10000000;
+        32'h0000000C: DAT <= 32'h20145687;
+        32'h0000000D: DAT <= 32'hac140044;
+        32'h0000000E: DAT <= 32'hac120040;
+        32'h0000000F: DAT <= 32'h8c100040;
+        32'h00000010: DAT <= 32'h80150044;
+        32'h00000011: DAT <= 32'h80160045;
+        32'h00000012: DAT <= 32'h80170046;
+        32'h00000013: DAT <= 32'h80180047;
+
+        32'h00000014: DAT <= 32'h22730001;
         32'h00000015: DAT <= 32'h22730001;
         32'h00000016: DAT <= 32'h22730001;
         32'h00000017: DAT <= 32'h22730001;
-        32'h00000018: DAT <= 32'h08000017;
+        32'h00000018: DAT <= 32'h22730001;
+        32'h00000019: DAT <= 32'h22730001;
+        32'h0000001A: DAT <= 32'h10000000;
+        32'h0000001B: DAT <= 32'h22730001;
+        32'h0000001C: DAT <= 32'h22730001;
+        32'h0000001D: DAT <= 32'h22730001;
+        32'h0000001E: DAT <= 32'h08000017;
         default: DAT <= 32'h00000000;
     endcase
 end
