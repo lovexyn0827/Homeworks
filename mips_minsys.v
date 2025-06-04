@@ -9,8 +9,8 @@ module RF (
 
 reg[31:0] regs[31:1];
 
-assign RD1 = regs[RI1];
-assign RD2 = regs[RI2];
+assign RD1 = RI1 == 0 ? 32'b0 : regs[RI1];
+assign RD2 = RI2 == 0 ? 32'b0 : regs[RI2];
 
 always @(posedge CLK) begin
     if (RST) begin
@@ -179,7 +179,7 @@ module SegRegsIF2ID(
 
 always @(posedge CLK) begin
     if (WRT) begin
-        INSN_D <= NOP ? 32'h00000020 : (RST ? 32'b0 : INSN_F);
+        INSN_D <= RST ? 32'h08000000 : (NOP ? 32'h00000020 : INSN_F);
         PCP4_D <= RST ? 32'b0 : PCP4_F;
     end
 end
@@ -280,6 +280,12 @@ assign SegRegsRstM2W = 1'b0;
 
 assign SegRegsWrtM2W = 1'b1;
 
+// Bypass ModelSim restraints
+
+wire RWrt_E, RWrt_M;
+wire[4:0] WIdx_E, WIdx_M;
+wire[31:0] AluOut_E, WDat_M, WDat_W;
+
 // Bypasses
 
 wire[31:0] Mem_Bypass;
@@ -353,7 +359,7 @@ CU cu(
     .RWRT(RWrt_D), 
     .MWRT(MWrt_D), 
     .NPC(NPC_D), 
-	.EXOPS(ExOps_D), 
+    .EXOPS(ExOps_D), 
     .LB(LB_D), 
     .VLD(Vld_D)
 );
@@ -407,9 +413,8 @@ assign PCBR_F = PCBR_D;
 // Stage III: Execution
 
 wire[3:0] AluC_E;
-wire AluB_E, M2R_E, RWrt_E, MWrt_E, LB_E;
+wire AluB_E, M2R_E, MWrt_E, LB_E;
 wire[31:0] QA_E, QB_E, Imm_E;
-wire[4:0] WIdx_E;
 
 SegRegsID2EXE ID2EXE(
     .CLK(EffClk), 
@@ -437,23 +442,20 @@ SegRegsID2EXE ID2EXE(
     .WIDX_E(WIdx_E)
 );
 
-wire[31:0] AluOut_E;
-
 ALU alu(
     .A(QA_E), 
     .B(AluB_E ? Imm_E : QB_E), 
     .FUNC(AluC_E), 
     .OUT(AluOut_E)
-	//.LT(LT), 
-	//.GT(GT), 
-	//.EQ()
+    //.LT(LT), 
+    //.GT(GT), 
+    //.EQ()
 );
 
 // Stage IV: Memory
 
 wire[31:0] AluOut_M, QB_M;
-wire[4:0] WIdx_M;
-wire RWrt_M, MWrt_M, M2R_M, LB_M;
+wire MWrt_M, M2R_M, LB_M;
 
 SegRegsEXE2MEM EXE2MEM(
     .CLK(EffClk), 
@@ -477,7 +479,7 @@ SegRegsEXE2MEM EXE2MEM(
 
 assign BypassMem = (WIdx_M != 5'b0) & 1'b0;   // TODO
 
-wire[31:0] BusDat_M, WDat_M;
+wire[31:0] BusDat_M;
 wire[7:0] DatBytesIn_M[3:0], ChosenByte_M;
 
 assign DatBytesIn_M[0] = DATIN[7:0];
@@ -499,8 +501,6 @@ assign MWRT = MWrt_M;
 assign Mem_Bypass = BusDat_M;
 
 // Stage V: Write Back
-
-wire[31:0] WDat_W;
 
 SegRegsMEM2WB MEM2WB(
     .CLK(EffClk), 
@@ -594,15 +594,15 @@ wire[31:0] Insn, DatBus;
 wire[31:0] DatAddr, InsnAddr;
 
 ROM progMem(
-	.ADDR(InsnAddr), 
-	.DAT(Insn)
+    .ADDR(InsnAddr), 
+    .DAT(Insn)
 );
 
 RAM dataMem(
-	.ADDR(DatAddr), 
-	.DAT(DatBus), 
-	.MWRT(MWrt), 
-	.CLK(CLK), 
+    .ADDR(DatAddr), 
+    .DAT(DatBus), 
+    .MWRT(MWrt), 
+    .CLK(CLK), 
     .RST(RST)
 );
 
@@ -618,3 +618,4 @@ CPU cpu(
 );
 
 endmodule
+
