@@ -17,9 +17,9 @@ public:
     void SetMonth(int m);
     void SetDay(int d);
 
-    int GetYear();
-    int GetMonth();
-    int GetDay();
+    int GetYear() const;
+    int GetMonth() const;
+    int GetDay() const;
 
     Date& operator()(int y, int m, int d);
 

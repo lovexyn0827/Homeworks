@@ -1,0 +1,10 @@
+<RCC>
+    <qresource prefix="/lovexyn0827/personnel/res">
+        <file>icon/add.png</file>
+        <file>icon/delete.png</file>
+        <file>icon/modify.png</file>
+        <file>icon/redo.png</file>
+        <file>icon/search3.ico</file>
+        <file>icon/undo.png</file>
+    </qresource>
+</RCC>

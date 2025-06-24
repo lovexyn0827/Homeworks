@@ -29,15 +29,15 @@ void Date::SetDay(int d) {
     this->day = d;
 }
 
-int Date::GetYear() {
+int Date::GetYear() const {
     return this->year;
 }
 
-int Date::GetMonth() {
+int Date::GetMonth() const {
     return this->month;
 }
 
-int Date::GetDay() {
+int Date::GetDay() const {
     return this->day;
 }
 

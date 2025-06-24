@@ -149,9 +149,9 @@ std::istream& operator>>(std::istream& in, Person& person) {
     in >> person.id;
     in >> person.name;
     in >> person.sex;
-    in >> person.phoneNo;
-    in >> person.address;
     in >> person.birthday;
+    in >> person.address;
+    in >> person.phoneNo;
     in >> person.employeeNo;
     in >> person.department;
     in >> person.post;
@@ -163,9 +163,9 @@ std::ostream& operator<<(std::ostream& out, Person& person) {
     out << person.id << ' ';
     out << person.name << ' ';
     out << person.sex << ' ';
-    out << person.phoneNo << ' ';
-    out << person.address << ' ';
     out << person.birthday << ' ';
+    out << person.address << ' ';
+    out << person.phoneNo << ' ';
     out << person.employeeNo << ' ';
     out << person.department << ' ';
     out << person.post << ' ';

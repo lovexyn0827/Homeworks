@@ -52,17 +52,23 @@ int PersonSet::ReadFromFile(const char filename[]) {
     std::ifstream fin(filename, std::ios::in);
     if (fin.fail()) {
         ERROR("Failed to open data file!")
+        return 0;
     }
 
     int cnt = 0;
-    while (!fin.eof()) {
+    while (fin.good() && !fin.eof()) {
         Person p;
         fin >> p;
         if (this->push_back(p)) {
             cnt++;
         } else {
-            ERROR("Omitting duplicated record.");
+           ERROR("Omitting duplicated record.");
         }
+    }
+
+    if (!this->empty()) {
+        this->pop_back();
+        cnt--;
     }
 
     return cnt;
@@ -72,17 +78,13 @@ int PersonSet::WriteToFile(const char filename[]) {
     std::ofstream fout(filename, std::ios::out | std::ios::trunc);
     if (fout.fail()) {
         ERROR("Failed to open data file!")
+        return 0;
     }
 
     int cnt = 0;
     for (PersonSet::iterator itr = this->begin(); itr != this->end(); itr++) {
-        fout << *itr;
+        fout << *itr << std::endl;
         cnt++;
-    }
-
-    if (!this->empty()) {
-        this->pop_back();
-        cnt--;
     }
 
     return cnt;
