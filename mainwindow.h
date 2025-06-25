@@ -6,7 +6,6 @@
 #include <QSpinBox>
 
 #include "personset.h"
-#include "util.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -26,14 +25,18 @@ private:
     Ui::MainWindow *ui;
     PersonSet & storage;
     bool prevAscending;
+    bool prevSortKeyColumn;
 
 private:
     void updateTableContents(std::function<bool(const Person &)> predicate = [](const Person & p) -> bool {
         return true;
     });
+    void updateTableRow(const Person & p, int row, bool sort = true);
+    Person* getPersonById(const std::string & id);
     void setupWidgets();
     void setupMenuBar();
     void setupToolBar();
     void setupStatusBar();
+    void filter();
 };
 #endif // MAINWINDOW_H

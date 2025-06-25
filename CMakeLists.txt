@@ -31,7 +31,8 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         util.h
         res.qrc
         util.cpp
-        editpersondialog.ui
+
+        editpersoninfodialog.h editpersoninfodialog.cpp editpersoninfodialog.ui
 
     )
 # Define target properties for Android with Qt 6 as:

@@ -6,5 +6,6 @@
         <file>icon/redo.png</file>
         <file>icon/search3.ico</file>
         <file>icon/undo.png</file>
+        <file>icon/view.png</file>
     </qresource>
 </RCC>

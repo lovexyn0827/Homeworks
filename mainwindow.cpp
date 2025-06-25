@@ -8,6 +8,9 @@
 #include <cstring>
 #include <algorithm>
 
+#include "util.h"
+#include "editpersoninfodialog.h"
+
 MainWindow::MainWindow(PersonSet & set, QWidget *parent)
     : QMainWindow(parent),
     ui(new Ui::MainWindow),
@@ -15,16 +18,20 @@ MainWindow::MainWindow(PersonSet & set, QWidget *parent)
 {
     ui->setupUi(this);
 
+    this->prevAscending = false;
+    this->prevSortKeyColumn = 0;
+
     this->setupWidgets();
     this->setupMenuBar();
     this->setupToolBar();
     this->setupStatusBar();
+
+    this->setWindowTitle(QString::fromUtf8("人事管理系统"));
 }
 
 
 void MainWindow::setupWidgets() {
     QTableWidget * table = this->ui->personTable;
-    prevAscending = false;
     table->setColumnCount(5);
     table->setRowCount(this->storage.size());
     table->setColumnWidth(0, 150);
@@ -35,12 +42,13 @@ void MainWindow::setupWidgets() {
            << QString::fromUtf8("生日")
            << QString::fromUtf8("工资");
     table->setHorizontalHeaderLabels(labels);
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     this->updateTableContents();
     connect(
         table->horizontalHeader(),
         &QHeaderView::sectionClicked,
         this,
-        [table, this](int col) -> void {
+        [=](int col) {
             table->sortByColumn(col, (this->prevAscending ^= true) ? Qt::DescendingOrder : Qt::AscendingOrder);
         }
     );
@@ -62,20 +70,8 @@ void MainWindow::setupWidgets() {
         this->ui->filterBtn,
         &QPushButton::clicked,
         this,
-        [this, table]() -> void {
-            std::string keyword;
-            this->updateTableContents([&keyword](const Person & person) -> bool {
-                return person.GetId() == keyword ||
-                       person.GetName() == keyword ||
-                       person.GetSex() == keyword ||
-                       person.GetPhoneNo() == keyword ||
-                       person.GetAddress() == keyword ||
-                       person.GetBirthday().format() == keyword ||
-                       person.GetEmployeeNo() == keyword ||
-                       person.GetDepartment() == keyword ||
-                       person.GetPost() == keyword ||
-                       std::to_string(person.GetSalary()) == keyword;
-            });
+        [this]() -> void {
+            this->filter();
         }
     );
 }
@@ -92,7 +88,25 @@ void MainWindow::setupToolBar() {
         &QToolButton::clicked,
         this,
         [this]() -> void {
-            // TODO
+            Person *newPerson = new Person();
+            EditPersonInfoDialog * dialog = new EditPersonInfoDialog(*newPerson, true, this);
+            dialog->show();
+            connect(
+                dialog,
+                &QDialog::accepted,
+                this,
+                [this, newPerson]() -> void {
+                    if (!this->storage.push_back(*newPerson)) {
+                        QMessageBox::warning(this, QString::fromUtf8("错误"), QString::fromUtf8("该用户已存在！"));
+                    }
+
+                    if (this->ui->filterEnabled->isChecked()) {
+                        this->filter();
+                    } else {
+                        this->updateTableContents();
+                    }
+                }
+            );
         }
     );
     this->ui->toolBar->addWidget(this->ui->deleteBtn);
@@ -127,9 +141,43 @@ void MainWindow::setupToolBar() {
         &QToolButton::clicked,
         this,
         [this]() -> void {
-            // TODO
+            int curRow = this->ui->personTable->currentRow();
+            std::string id = this->ui->personTable->item(curRow, 0)->text().toStdString();
+            Person * selected = this->getPersonById(id);
+            if (selected == nullptr) {
+                return;
+            }
+
+            EditPersonInfoDialog * dialog = new EditPersonInfoDialog(*selected, true, this);
+            dialog->show();
+            connect(
+                dialog,
+                &QDialog::accepted,
+                this,
+                [selected, curRow, this]() -> void {
+                    this->updateTableRow(*selected, curRow);
+                }
+            );
         }
     );
+    this->ui->toolBar->addWidget(this->ui->viewBtn);
+    connect(
+        this->ui->viewBtn,
+        &QToolButton::clicked,
+        this,
+        [this]() -> void {
+            int curRow = this->ui->personTable->currentRow();
+            std::string id = this->ui->personTable->item(curRow, 0)->text().toStdString();
+            Person * selected = this->getPersonById(id);
+            if (selected == nullptr) {
+                return;
+            }
+
+            EditPersonInfoDialog * dialog = new EditPersonInfoDialog(*selected, false, this);
+            dialog->show();
+            connect(dialog, &QDialog::accepted, this, []() -> void {});
+        }
+        );
     this->ui->toolBar->addWidget(this->ui->undoBtn);
     connect(
         this->ui->undoBtn,
@@ -153,10 +201,10 @@ void MainWindow::setupToolBar() {
 void MainWindow::setupStatusBar() {
     QStatusBar * statusBar = this->ui->statusbar;
     QLabel * cnu = new QLabel("Capital Normal University");
-    statusBar->addWidget(cnu);
+    statusBar->addPermanentWidget(cnu);
     QTimer * timer = new QTimer();
     QLabel * time = new QLabel(QDateTime::currentDateTime().toString());
-    statusBar->addPermanentWidget(time);
+    statusBar->addWidget(time);
     timer->setInterval(1000);
     timer->start();
     connect(
@@ -174,19 +222,59 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::updateTableContents(std::function<bool(const Person &)> predicate) {
-    QTableWidget * table = this->ui->personTable;
+Person* MainWindow::getPersonById(const std::string & id) {
     int curRow = 0;
+    for (Person & p : this->storage) {
+        if (p.GetId() == id) {
+            return &p;
+        }
+    }
+
+    return nullptr;
+}
+
+void MainWindow::updateTableContents(std::function<bool(const Person &)> predicate) {
+    int curRow = 0;
+    QTableWidget * table = this->ui->personTable;
+    table->clear();
+    table->setRowCount(0);
     for (Person & p : this->storage) {
         if (!predicate(p)) {
             continue;
         }
 
-        table->setItem(curRow, 0, new QTableWidgetItem(QString::fromStdString(p.GetId())));
-        table->setItem(curRow, 1, new QTableWidgetItem(QString::fromStdString(p.GetName())));
-        table->setItem(curRow, 2, new QTableWidgetItem(QString::fromStdString(p.GetSex())));
-        table->setItem(curRow, 3, new QTableWidgetItem(QString::fromStdString(p.GetBirthday().format())));
-        table->setItem(curRow, 4, new QTableWidgetItem(QString::number(p.GetSalary())));
-        curRow++;
+        table->setRowCount(table->rowCount() + 1);
+        this->updateTableRow(p, curRow++, false);
+
     }
+
+    table->sortByColumn(this->prevSortKeyColumn, this->prevAscending ? Qt::DescendingOrder : Qt::AscendingOrder);
+}
+
+void MainWindow::updateTableRow(const Person & p, int row, bool sort) {
+    QTableWidget * table = this->ui->personTable;
+    table->setItem(row, 0, new QTableWidgetItem(QString::fromStdString(p.GetId())));
+    table->setItem(row, 1, new QTableWidgetItem(QString::fromStdString(p.GetName())));
+    table->setItem(row, 2, new QTableWidgetItem(QString::fromStdString(p.GetSex())));
+    table->setItem(row, 3, new QTableWidgetItem(QString::fromStdString(p.GetBirthday().format())));
+    table->setItem(row, 4, new QTableWidgetItem(QString::number(p.GetSalary())));
+    if (sort) {
+        table->sortByColumn(this->prevSortKeyColumn, this->prevAscending ? Qt::DescendingOrder : Qt::AscendingOrder);
+    }
+}
+
+void MainWindow::filter() {
+    std::string keyword = this->ui->filterKeyInput->text().toStdString();
+    this->updateTableContents([&keyword](const Person & person) -> bool {
+        return person.GetId() == keyword ||
+               person.GetName() == keyword ||
+               person.GetSex() == keyword ||
+               person.GetPhoneNo() == keyword ||
+               person.GetAddress() == keyword ||
+               person.GetBirthday().format() == keyword ||
+               person.GetEmployeeNo() == keyword ||
+               person.GetDepartment() == keyword ||
+               person.GetPost() == keyword ||
+               std::to_string(person.GetSalary()) == keyword;
+    });
 }
