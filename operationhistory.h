@@ -3,24 +3,21 @@
 
 #include <stack>
 #include "operation.h"
-
-namespace lovexyn0827 {
-namespace personnel {
+#include "personset.h"
 
 class OperationHistory
 {
 private:
-    std::stack<Operation*> operationHistory;
-    std::stack<Operation*> undoneOperations;
+    PersonSet & storage;
+
+    std::stack<const Operation*> operationHistory;
+    std::stack<const Operation*> undoneOperations;
 public:
-    OperationHistory();
+    OperationHistory(PersonSet & storage);
 
-    void undo();
-    void redo();
-    void pushOperation(Operation & op);
+    bool undo();
+    bool redo();
+    void pushOperation(const Operation * op);
 };
-
-} // namespace personnel
-} // namespace lovexyn0827
 
 #endif // OPERATIONHISTORY_H

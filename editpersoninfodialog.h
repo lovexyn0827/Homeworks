@@ -15,7 +15,7 @@ class EditPersonInfoDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit EditPersonInfoDialog(Person & person, bool editable, QWidget *parent = nullptr);
+    explicit EditPersonInfoDialog(Person & person, bool editable, bool anew, QWidget *parent = nullptr);
     ~EditPersonInfoDialog();
 
 private:

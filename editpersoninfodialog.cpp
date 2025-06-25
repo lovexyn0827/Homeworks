@@ -4,7 +4,7 @@
 #include <QMessageBox>
 #include <regex>
 
-EditPersonInfoDialog::EditPersonInfoDialog(Person & person, bool editable, QWidget *parent)
+EditPersonInfoDialog::EditPersonInfoDialog(Person & person, bool editable, bool anew, QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::EditPersonInfoDialog)
 {
@@ -13,6 +13,24 @@ EditPersonInfoDialog::EditPersonInfoDialog(Person & person, bool editable, QWidg
     //this->setWindowTitle("");
     this->ui->genderComboBox->addItems(QStringList() << QString::fromUtf8("男") << QString::fromUtf8("女"));
     this->loadPersonInfo(person);
+    if (anew) {
+        connect(
+            this->ui->idLineEdit,
+            &QLineEdit::textChanged,
+            this,
+            [this](const QString & id) -> void {
+                std::regex idRegex("^[1-9][0-9]{16}[0-9X]$");
+                if (!std::regex_match(id.toStdString(), idRegex)) {
+                    return;
+                }
+
+                int dob = id.sliced(6, 8).toInt();
+                this->ui->dobEdit->setDate(QDate(dob / 10000, (dob % 10000) / 100, dob % 100));
+                this->ui->genderComboBox->setCurrentIndex((id[16].cell() % 2 == 0) ? 1 : 0);
+            }
+        );
+    }
+
     connect(
         this->ui->buttonBox,
         &QDialogButtonBox::accepted,
@@ -37,14 +55,8 @@ EditPersonInfoDialog::EditPersonInfoDialog(Person & person, bool editable, QWidg
                     throw "AssertionError";
                 }
             }
-        }
-    );
-    connect(
-        this->ui->buttonBox,
-        &QDialogButtonBox::rejected,
-        this,
-        [this, editable, &person]() -> void {
-            this->reject();
+
+            this->accept();
         }
     );
     if (!editable) {
@@ -62,6 +74,15 @@ EditPersonInfoDialog::EditPersonInfoDialog(Person & person, bool editable, QWidg
     } else {
         this->ui->buttonBox->setStandardButtons(QDialogButtonBox::Save | QDialogButtonBox::Cancel);
     }
+
+    connect(
+        this->ui->buttonBox,
+        &QDialogButtonBox::rejected,
+        this,
+        [this, editable, &person]() -> void {
+            this->reject();
+        }
+    );
 }
 
 EditPersonInfoDialog::~EditPersonInfoDialog() {
@@ -131,6 +152,8 @@ EditPersonInfoDialog::ValidationResult EditPersonInfoDialog::validate() {
 
     const std::string & id = this->ui->idLineEdit->text().toStdString();
     std::regex idRegex("^[1-9][0-9]{16}[0-9X]$");
+    return OK;
+
     if (!std::regex_match(id.c_str(), idRegex)) {
         return INVALID_ID;
     }
@@ -141,18 +164,18 @@ EditPersonInfoDialog::ValidationResult EditPersonInfoDialog::validate() {
 
     const QDate &dob = this->ui->dobEdit->date();
     if (id.substr(6, 4) != std::to_string(dob.year())) {
-        //return INVALID_ID;
+        return INVALID_ID;
     }
 
     if (QString::fromStdString(id.substr(10, 2)).toInt() != dob.month()) {
-        //return INVALID_ID;
+        return INVALID_ID;
     }
 
     if (QString::fromStdString(id.substr(12, 2)).toInt() != dob.day()) {
-        //return INVALID_ID;
+        return INVALID_ID;
     }
 
-    int checksum = 0;
+    /*int checksum = 0;
     int w = 1;
     for (int i = 0; i < 18; i++) {
         char c = id[17 - i];
@@ -163,7 +186,7 @@ EditPersonInfoDialog::ValidationResult EditPersonInfoDialog::validate() {
 
     if (checksum % 11 != 1) {
         return INVALID_ID;
-    }
+    }*/
 
     return OK;
 }

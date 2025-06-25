@@ -44,7 +44,7 @@ std::deque<Person>::iterator PersonSet::insert(std::deque<Person>::iterator i, c
         return i;
     } else {
         this->deque<Person>::insert(i, person);
-        return i + 1;
+        return i;
     }
 }
 

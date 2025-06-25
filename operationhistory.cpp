@@ -1,30 +1,28 @@
 #include "operationhistory.h"
 
-namespace lovexyn0827 {
-namespace personnel {
+OperationHistory::OperationHistory(PersonSet & storage) : storage(storage) {}
 
-OperationHistory::OperationHistory() {}
-
-void OperationHistory::redo() {
-    Operation * op = this->undoneOperations.top();
+bool OperationHistory::redo() {
+    const Operation * op = this->undoneOperations.top();
     this->operationHistory.push(op);
-    op->redo();
+    op->redo(this->storage);
     this->undoneOperations.pop();
+    return this->operationHistory.empty();
 }
 
-void OperationHistory::undo() {
-    Operation * op = this->operationHistory.top();
+bool OperationHistory::undo() {
+    const Operation * op = this->operationHistory.top();
     this->undoneOperations.push(op);
-    op->undo();
+    op->undo(this->storage);
     this->operationHistory.pop();
+    return this->operationHistory.empty();
 }
 
-void OperationHistory::pushOperation(Operation & op) {
+void OperationHistory::pushOperation(const Operation * op) {
     while (!this->undoneOperations.empty()) {
         delete this->undoneOperations.top();
-
+        this->undoneOperations.pop();
     }
-}
 
-} // namespace personnel
-} // namespace lovexyn0827
+    this->operationHistory.push(op);
+}

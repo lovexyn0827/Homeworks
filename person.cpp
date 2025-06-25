@@ -160,15 +160,15 @@ std::istream& operator>>(std::istream& in, Person& person) {
 }
 
 std::ostream& operator<<(std::ostream& out, Person& person) {
-    out << person.id << ' ';
-    out << person.name << ' ';
-    out << person.sex << ' ';
-    out << person.birthday << ' ';
-    out << person.address << ' ';
-    out << person.phoneNo << ' ';
-    out << person.employeeNo << ' ';
-    out << person.department << ' ';
-    out << person.post << ' ';
+    out << person.id << std::endl;
+    out << person.name << std::endl;
+    out << person.sex << std::endl;
+    out << person.birthday << std::endl;
+    out << person.address << std::endl;
+    out << person.phoneNo << std::endl;
+    out << person.employeeNo << std::endl;
+    out << person.department << std::endl;
+    out << person.post << std::endl;
     out << person.salary;
     return out;
 }

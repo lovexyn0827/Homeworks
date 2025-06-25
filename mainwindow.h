@@ -6,6 +6,7 @@
 #include <QSpinBox>
 
 #include "personset.h"
+#include "operationhistory.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -22,21 +23,31 @@ public:
     ~MainWindow();
 
 private:
+    constexpr static int NIL_ROW = -1;
     Ui::MainWindow *ui;
     PersonSet & storage;
+    OperationHistory operationHistory;
     bool prevAscending;
-    bool prevSortKeyColumn;
+    int prevSortKeyColumn;
 
 private:
     void updateTableContents(std::function<bool(const Person &)> predicate = [](const Person & p) -> bool {
         return true;
     });
-    void updateTableRow(const Person & p, int row, bool sort = true);
+    void updateTableRow(const Person & p, int row, bool batched = false);
     Person* getPersonById(const std::string & id);
     void setupWidgets();
     void setupMenuBar();
     void setupToolBar();
     void setupStatusBar();
+    void openViewDialog(int row);
+    void openModifyDialog(int row);
+    void openAddDialog();
+    void deleteSeclectedRows();
     void filter();
+    bool shouldFilter();
+    void sort(bool toggle = false);
+    void pushOperation(const Operation * op);
+    int indexOf(const std::string & id);
 };
 #endif // MAINWINDOW_H
