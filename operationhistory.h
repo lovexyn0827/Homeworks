@@ -18,6 +18,7 @@ public:
     bool undo();
     bool redo();
     void pushOperation(const Operation * op);
+    void reset();
 };
 
 #endif // OPERATIONHISTORY_H

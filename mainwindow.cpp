@@ -8,7 +8,6 @@
 #include <QFileDialog>
 #include <QContextMenuEvent>
 
-#include <cstring>
 #include <algorithm>
 
 #include "editpersoninfodialog.h"
@@ -149,13 +148,12 @@ void MainWindow::setupMenuBar() {
         &QAction::triggered,
         this,
         [this](bool bl) -> void {
-            if (!this->personSetDirty || this->openSaveConfirmationDialog()) {
+            if (this->confirmUnsavedChanges()) {
+                this->operationHistory.reset();
                 this->personSetDirty = false;
                 this->prevFile = "";
                 this->storage.clear();
                 this->updateTableContents();
-            } else {
-                this->openSaveDialog();
             }
         }
     );
@@ -164,11 +162,16 @@ void MainWindow::setupMenuBar() {
         &QAction::triggered,
         this,
         [this](bool bl) -> void {
+            if (!this->confirmUnsavedChanges()) {
+                return;
+            }
+
             QFileDialog * fileChooser = new QFileDialog();
             fileChooser->setFileMode(QFileDialog::ExistingFile);
             if (fileChooser->exec() == QFileDialog::Accepted) {
                 QList<QString> chosenFiles = fileChooser->selectedFiles();
                 if (!chosenFiles.empty()) {
+                    this->operationHistory.reset();
                     this->prevFile = chosenFiles.first().toStdString();
                     this->storage.ReadFromFile(chosenFiles.first().toStdString().c_str());
                     this->updateTableContents();
@@ -184,12 +187,7 @@ void MainWindow::setupMenuBar() {
         &QAction::triggered,
         this,
         [this](bool bl) -> void {
-            if (this->prevFile.empty()) {
-                this->openSaveDialog();
-            }
-
-            this->storage.WriteToFile(this->prevFile.c_str());
-            this->personSetDirty = false;
+            this->save();
         }
     );
     connect(
@@ -205,10 +203,8 @@ void MainWindow::setupMenuBar() {
         &QAction::triggered,
         this,
         [this](bool bl) -> void {
-            if (!this->personSetDirty || this->openSaveConfirmationDialog()) {
+            if (this->confirmUnsavedChanges()) {
                 this->close();
-            } else {
-                this->openSaveDialog();
             }
         }
     );
@@ -402,14 +398,37 @@ void MainWindow::deleteSeclectedRows() {
     this->pushOperation(new DeleteOperation(*deletedPersons, *deletedIndices));
 }
 
-bool MainWindow::openSaveConfirmationDialog() {
+void MainWindow::save() {
+    if (this->prevFile.empty()) {
+        this->openSaveDialog();
+    } else {
+        this->storage.WriteToFile(this->prevFile.c_str());
+        this->personSetDirty = false;
+    }
+}
+
+bool MainWindow::confirmUnsavedChanges() {
+    if (!this->personSetDirty) {
+        return true;
+    }
+
     QMessageBox::StandardButton result = QMessageBox::question(
         this,
         QString::fromUtf8("未保存的修改"),
-        QString::fromUtf8("有修改未保存，是否放弃并退出？")
+        QString::fromUtf8("有修改未保存，是否保存并退出？"),
+        QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel,
+        QMessageBox::Yes
     );
 
-    return result == QMessageBox::Yes;
+    if (result == QMessageBox::Cancel) {
+        return false;
+    }
+
+    if (result == QMessageBox::Yes) {
+        this->save();
+    }
+
+    return true;
 }
 
 void MainWindow::openSaveDialog() {

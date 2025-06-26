@@ -46,8 +46,9 @@ private:
     void openModifyDialog(int row);
     void openAddDialog();
     void deleteSeclectedRows();
-    bool openSaveConfirmationDialog();
+    bool confirmUnsavedChanges();
     void openSaveDialog();
+    void save();
     void filter();
     bool shouldFilter();
     void sort(bool toggle = false);

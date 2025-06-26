@@ -26,3 +26,15 @@ void OperationHistory::pushOperation(const Operation * op) {
 
     this->operationHistory.push(op);
 }
+
+void OperationHistory::reset() {
+    while (!this->operationHistory.empty()) {
+        delete this->undoneOperations.top();
+        this->undoneOperations.pop();
+    }
+
+    while (!this->undoneOperations.empty()) {
+        delete this->undoneOperations.top();
+        this->undoneOperations.pop();
+    }
+}

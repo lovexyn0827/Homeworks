@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
     PersonSet set;
-    //set.ReadFromFile(DATA_FILE);
+    set.ReadFromFile(DATA_FILE);
     if (std::filesystem::exists(BACKUP_FILE)) {
         std::filesystem::remove(BACKUP_FILE);
     }
@@ -21,6 +21,6 @@ int main(int argc, char *argv[])
     MainWindow w(set, DATA_FILE);
     w.show();
     int status = a.exec();
-    //set.WriteToFile(DATA_FILE);
+    set.WriteToFile(DATA_FILE);
     return status;
 }

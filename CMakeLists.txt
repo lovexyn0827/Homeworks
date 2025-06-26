@@ -28,9 +28,9 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         date.h date.cpp
         person.h person.cpp
         personset.h personset.cpp
-        util.h
+
         res.qrc
-        util.cpp
+
 
         editpersoninfodialog.h editpersoninfodialog.cpp editpersoninfodialog.ui
 

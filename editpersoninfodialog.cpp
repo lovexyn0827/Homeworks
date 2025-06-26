@@ -54,9 +54,9 @@ EditPersonInfoDialog::EditPersonInfoDialog(Person & person, bool editable, bool 
                 default:
                     throw "AssertionError";
                 }
+            } else {
+                this->accept();
             }
-
-            this->reject();
         }
     );
     if (!editable) {
