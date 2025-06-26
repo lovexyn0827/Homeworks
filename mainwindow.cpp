@@ -11,19 +11,20 @@
 #include <cstring>
 #include <algorithm>
 
-#include "util.h"
 #include "editpersoninfodialog.h"
 
-MainWindow::MainWindow(PersonSet & set, QWidget *parent)
+MainWindow::MainWindow(PersonSet & set, const std::string & file, QWidget *parent)
     : QMainWindow(parent),
     ui(new Ui::MainWindow),
     storage(set),
-    operationHistory(storage)
+    operationHistory(storage),
+    prevFile(file)
 {
     ui->setupUi(this);
 
     this->prevAscending = true;
     this->prevSortKeyColumn = 0;
+    this->personSetDirty = false;
 
     this->setupWidgets();
     this->setupMenuBar();
@@ -31,6 +32,7 @@ MainWindow::MainWindow(PersonSet & set, QWidget *parent)
     this->setupStatusBar();
 
     this->setWindowTitle(QString::fromUtf8("人事管理系统"));
+    this->setWindowIcon(QIcon(":/lovexyn0827/personnel/res/icon/add.png"));
 }
 
 void MainWindow::setupWidgets() {
@@ -76,6 +78,14 @@ void MainWindow::setupWidgets() {
                 this,
                 [&pos, this, table](bool bl) -> void {
                     this->deleteSeclectedRows();
+                }
+            );
+            connect(
+                contextMenu->addAction(QString::fromUtf8("新建")),
+                &QAction::triggered,
+                this,
+                [&pos, this, table](bool bl) -> void {
+                    this->openAddDialog();
                 }
             );
             contextMenu->exec(table->viewport()->mapToGlobal(pos));
@@ -129,9 +139,26 @@ void MainWindow::setupWidgets() {
 void MainWindow::setupMenuBar() {
     QMenuBar * menu = this->ui->menubar;
     QMenu * fileMenu = new QMenu(QString::fromUtf8("文件"));
+    QAction * newAction = new QAction(QString::fromUtf8("新建"));
     QAction * openAction = new QAction(QString::fromUtf8("打开"));
     QAction * saveAction = new QAction(QString::fromUtf8("保存"));
+    QAction * saveAsAction = new QAction(QString::fromUtf8("另存为"));
     QAction * closeAction = new QAction(QString::fromUtf8("关闭"));
+    connect(
+        newAction,
+        &QAction::triggered,
+        this,
+        [this](bool bl) -> void {
+            if (!this->personSetDirty || this->openSaveConfirmationDialog()) {
+                this->personSetDirty = false;
+                this->prevFile = "";
+                this->storage.clear();
+                this->updateTableContents();
+            } else {
+                this->openSaveDialog();
+            }
+        }
+    );
     connect(
         openAction,
         &QAction::triggered,
@@ -142,13 +169,53 @@ void MainWindow::setupMenuBar() {
             if (fileChooser->exec() == QFileDialog::Accepted) {
                 QList<QString> chosenFiles = fileChooser->selectedFiles();
                 if (!chosenFiles.empty()) {
+                    this->prevFile = chosenFiles.first().toStdString();
                     this->storage.ReadFromFile(chosenFiles.first().toStdString().c_str());
+                    this->updateTableContents();
+                    if (this->shouldFilter()) {
+                        this->filter();
+                    }
                 }
             }
         }
     );
+    connect(
+        saveAction,
+        &QAction::triggered,
+        this,
+        [this](bool bl) -> void {
+            if (this->prevFile.empty()) {
+                this->openSaveDialog();
+            }
+
+            this->storage.WriteToFile(this->prevFile.c_str());
+            this->personSetDirty = false;
+        }
+    );
+    connect(
+        saveAsAction,
+        &QAction::triggered,
+        this,
+        [this](bool bl) -> void {
+            this->openSaveDialog();
+        }
+    );
+    connect(
+        closeAction,
+        &QAction::triggered,
+        this,
+        [this](bool bl) -> void {
+            if (!this->personSetDirty || this->openSaveConfirmationDialog()) {
+                this->close();
+            } else {
+                this->openSaveDialog();
+            }
+        }
+    );
+    fileMenu->addAction(newAction);
     fileMenu->addAction(openAction);
     fileMenu->addAction(saveAction);
+    fileMenu->addAction(saveAsAction);
     fileMenu->addSeparator();
     fileMenu->addAction(closeAction);
     menu->addMenu(fileMenu);
@@ -159,7 +226,7 @@ void MainWindow::setupMenuBar() {
         &QAction::triggered,
         this,
         [this](bool bl) -> void {
-            QMessageBox::information(this, QString::fromUtf8("关于"), QString::fromUtf8("人事管理系统 v20200625"));
+            QMessageBox::about(this, QString::fromUtf8("关于"), QString::fromUtf8("人事管理系统 v20200625"));
         }
     );
     aboutMenu->addAction(versionAction);
@@ -263,9 +330,8 @@ void MainWindow::openViewDialog(int row) {
         return;
     }
 
-    EditPersonInfoDialog * dialog = new EditPersonInfoDialog(*selected, false, false, this);
-    dialog->show();
-    connect(dialog, &QDialog::accepted, this, []() -> void {});
+    EditPersonInfoDialog dialog(*selected, false, false, this);
+    dialog.exec();
 }
 
 void MainWindow::openModifyDialog(int row) {
@@ -279,9 +345,9 @@ void MainWindow::openModifyDialog(int row) {
         return;
     }
 
-    EditPersonInfoDialog * dialog = new EditPersonInfoDialog(*selected, true, false, this);
+    EditPersonInfoDialog dialog(*selected, true, false, this);
     Person original = *selected;
-    if (dialog->exec() == QDialog::Accepted) {
+    if (dialog.exec() == QDialog::Accepted) {
         // Person object itself updated in `EditPersonInfoDialog`
         this->updateTableRow(*selected, row);
         this->pushOperation(new ModifyOperation(original, *selected, this->indexOf(selected->GetId())));
@@ -290,8 +356,8 @@ void MainWindow::openModifyDialog(int row) {
 
 void MainWindow::openAddDialog() {
     Person newPerson;
-    EditPersonInfoDialog * dialog = new EditPersonInfoDialog(newPerson, true, true, this);
-    if (dialog->exec() == QDialog::Accepted) {
+    EditPersonInfoDialog dialog(newPerson, true, true, this);
+    if (dialog.exec() == QDialog::Accepted) {
         if (!this->storage.push_back(newPerson)) {
             QMessageBox::warning(this, QString::fromUtf8("错误"), QString::fromUtf8("该用户已存在！"));
         }
@@ -334,6 +400,29 @@ void MainWindow::deleteSeclectedRows() {
     }
 
     this->pushOperation(new DeleteOperation(*deletedPersons, *deletedIndices));
+}
+
+bool MainWindow::openSaveConfirmationDialog() {
+    QMessageBox::StandardButton result = QMessageBox::question(
+        this,
+        QString::fromUtf8("未保存的修改"),
+        QString::fromUtf8("有修改未保存，是否放弃并退出？")
+    );
+
+    return result == QMessageBox::Yes;
+}
+
+void MainWindow::openSaveDialog() {
+    QFileDialog * fileChooser = new QFileDialog();
+    fileChooser->setFileMode(QFileDialog::AnyFile);
+    if (fileChooser->exec() == QFileDialog::Accepted) {
+        QList<QString> chosenFiles = fileChooser->selectedFiles();
+        if (!chosenFiles.empty()) {
+            this->prevFile = chosenFiles.first().toStdString();
+            this->storage.WriteToFile(chosenFiles.first().toStdString().c_str());
+            this->personSetDirty = false;
+        }
+    }
 }
 
 MainWindow::~MainWindow()
@@ -431,6 +520,7 @@ void MainWindow::pushOperation(const Operation * op) {
     this->operationHistory.pushOperation(op);
     this->ui->undoBtn->setEnabled(true);
     this->ui->redoBtn->setEnabled(false);
+    this->personSetDirty = true;
 }
 
 int MainWindow::indexOf(const std::string & id) {

@@ -56,7 +56,7 @@ EditPersonInfoDialog::EditPersonInfoDialog(Person & person, bool editable, bool 
                 }
             }
 
-            this->accept();
+            this->reject();
         }
     );
     if (!editable) {
@@ -152,8 +152,6 @@ EditPersonInfoDialog::ValidationResult EditPersonInfoDialog::validate() {
 
     const std::string & id = this->ui->idLineEdit->text().toStdString();
     std::regex idRegex("^[1-9][0-9]{16}[0-9X]$");
-    return OK;
-
     if (!std::regex_match(id.c_str(), idRegex)) {
         return INVALID_ID;
     }

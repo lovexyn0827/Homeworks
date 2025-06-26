@@ -55,6 +55,7 @@ int PersonSet::ReadFromFile(const char filename[]) {
         return 0;
     }
 
+    this->clear();
     int cnt = 0;
     while (fin.good() && !fin.eof()) {
         Person p;

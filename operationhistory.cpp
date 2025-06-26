@@ -7,7 +7,7 @@ bool OperationHistory::redo() {
     this->operationHistory.push(op);
     op->redo(this->storage);
     this->undoneOperations.pop();
-    return this->operationHistory.empty();
+    return !this->undoneOperations.empty();
 }
 
 bool OperationHistory::undo() {
@@ -15,7 +15,7 @@ bool OperationHistory::undo() {
     this->undoneOperations.push(op);
     op->undo(this->storage);
     this->operationHistory.pop();
-    return this->operationHistory.empty();
+    return !this->operationHistory.empty();
 }
 
 void OperationHistory::pushOperation(const Operation * op) {

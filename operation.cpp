@@ -24,11 +24,6 @@ void DeleteOperation::undo(PersonSet & storage) const {
     std::list<Person>::const_reverse_iterator affectedItr = this->deleted.rbegin();
     std::list<int>::const_reverse_iterator affectedIdxItr = this->deletedIndices.rbegin();
     while (affectedIdxItr != this->deletedIndices.rend()) {
-        for(Person & p : storage) {
-            std::cout << p.GetBirthday().format() << std::endl;
-        }
-
-        std::cout << "#################" << std::endl;
         storage.insert(storage.begin() + *affectedIdxItr, *affectedItr);
         affectedItr++;
         affectedIdxItr++;

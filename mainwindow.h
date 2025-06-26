@@ -19,7 +19,7 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(PersonSet & set, QWidget *parent = nullptr);
+    MainWindow(PersonSet & set, const std::string & file, QWidget *parent = nullptr);
     ~MainWindow();
 
 private:
@@ -29,6 +29,8 @@ private:
     OperationHistory operationHistory;
     bool prevAscending;
     int prevSortKeyColumn;
+    bool personSetDirty;
+    std::string prevFile;
 
 private:
     void updateTableContents(std::function<bool(const Person &)> predicate = [](const Person & p) -> bool {
@@ -44,6 +46,8 @@ private:
     void openModifyDialog(int row);
     void openAddDialog();
     void deleteSeclectedRows();
+    bool openSaveConfirmationDialog();
+    void openSaveDialog();
     void filter();
     bool shouldFilter();
     void sort(bool toggle = false);
